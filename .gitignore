@@ -1,0 +1,14 @@
+Components/hal/target/CC2530USB/
+Components/hal/target/CC2530ZNP/
+Projects/zstack/HomeAutomation/
+Projects/zstack/OTA/
+Projects/zstack/SE/
+Projects/zstack/Utilities/
+Projects/zstack/ZBA/
+Projects/zstack/ZMain/TI2530ZNP/
+Projects/zstack/ZNP/
+
+Projects/zstack/Samples/SampleApp/CC2530DB/CoordinatorEB/
+Projects/zstack/Samples/SampleApp/CC2530DB/EndDeviceEB/
+Projects/zstack/Samples/SampleApp/CC2530DB/RouterEB/
+Projects/zstack/Samples/SampleApp/CC2530DB/test/
