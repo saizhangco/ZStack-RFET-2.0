@@ -179,7 +179,7 @@ void SampleApp_Send_C2E_Message( uint8* msg );              //通过无线发送数据到
 
 #if ( ZSTACK_DEVICE_BUILD == DEVICE_BUILD_ENDDEVICE )	//$$^^终端设备^^$$
 
-void SampleApp_Send_P2P_Message(void);
+void SampleApp_Send_P2P_Message(uint8 powerStatus);
 void SampleApp_Send_E2C_Ack( uint8* value, uint8 length );// 终端设备给协调器回复
 void SampleApp_Send_E2C_PushBtn_Evt( uint8 evt );         // 终端设备主动发送PushButton事件
 
@@ -291,8 +291,8 @@ void SampleApp_Init( uint8 task_id )
     HalLcdWriteString( (char*)_guid_str, HAL_LCD_LINE_4 );
 #endif
 
-	osal_start_timerEx( SampleApp_TaskID, SAMPLEAPP_ED_LCD_RST_EVT,
-            (SAMPLEAPP_SEND_PERIODIC_MSG_TIMEOUT) );	// 10s后清屏
+	//osal_start_timerEx( SampleApp_TaskID, SAMPLEAPP_ED_LCD_RST_EVT,
+    //        (SAMPLEAPP_SEND_PERIODIC_MSG_TIMEOUT) );	// 10s后清屏
 }
 
 /*********************************************************************
@@ -310,6 +310,7 @@ void SampleApp_Init( uint8 task_id )
  */
 uint16 SampleApp_ProcessEvent( uint8 task_id, uint16 events )
 {
+    uint8 key = 0;
     afIncomingMSGPacket_t *MSGpkt;
     (void)task_id;  // Intentionally unreferenced parameter
 
@@ -377,7 +378,18 @@ uint16 SampleApp_ProcessEvent( uint8 task_id, uint16 events )
         // Send the periodic message
         //SampleApp_SendPeriodicMessage();
 #if ( ZSTACK_DEVICE_BUILD == DEVICE_BUILD_ENDDEVICE )	//终端设备
-        SampleApp_Send_P2P_Message();
+        key = HalKeyRead();
+        if( (key & HAL_KEY_SW_6) != 0 )
+        {   // 有电
+            HalLedSet (HAL_LED_2, HAL_LED_MODE_OFF);
+            SampleApp_Send_P2P_Message(0);
+        }
+        else
+        {   // 没有电了
+            HalLedSet (HAL_LED_2, HAL_LED_MODE_ON);
+            SampleApp_Send_P2P_Message(1);
+        }
+
 #endif //终端设备
 
         // Setup to send message again in normal period (+ a little jitter)
@@ -399,9 +411,9 @@ uint16 SampleApp_ProcessEvent( uint8 task_id, uint16 events )
 	}
 #if ( ZSTACK_DEVICE_BUILD == DEVICE_BUILD_ENDDEVICE )	//终端设备
     //^^^^^^^^触发按键确认事件^^^^^^^^
-    if( events & SAMPLEAPP_KEY_QUERY_EVT)//SAMPLEAPP_KEY_ACK_EVT )
+    if( events & SAMPLEAPP_KEY_ACK_EVT )
     {
-#if 1 //调试-确认事件触发
+#if 0 //调试-确认事件触发
         HalUARTWrite(0x00, "SAMPLEAPP_KEY_ACK_EVT\n", 22);       
 #endif
         //HalLcdInit();
@@ -420,10 +432,10 @@ uint16 SampleApp_ProcessEvent( uint8 task_id, uint16 events )
                 SampleApp_Send_E2C_PushBtn_Evt(SampleAppAckEvent);
             }
         }
-        return ( events ^ SAMPLEAPP_KEY_QUERY_EVT);//SAMPLEAPP_KEY_ACK_EVT );
+        return ( events ^ SAMPLEAPP_KEY_ACK_EVT );
     }
     //^^^^^^^^触发按键查询事件^^^^^^^^
-    if( events & SAMPLEAPP_KEY_ACK_EVT)//SAMPLEAPP_KEY_QUERY_EVT )
+    if( events & SAMPLEAPP_KEY_QUERY_EVT )
     {
       //$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
       //测试程序，显示32*64的内容
@@ -451,7 +463,7 @@ uint16 SampleApp_ProcessEvent( uint8 task_id, uint16 events )
       }
 #endif
       //$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
-#if 1 //查询事件触发调试
+#if 0 //查询事件触发调试
         HalUARTWrite(0x00, "SAMPLEAPP_KEY_QUERY_EVT\n", 24);       
 #endif
         //1 判断是否存在确认事件
@@ -469,7 +481,7 @@ uint16 SampleApp_ProcessEvent( uint8 task_id, uint16 events )
             MedicineBusinessEnd();  //关闭LCD上的显示
             query_medicine = 0;
         }
-        return ( events ^ SAMPLEAPP_KEY_ACK_EVT);// SAMPLEAPP_KEY_QUERY_EVT );
+        return ( events ^ SAMPLEAPP_KEY_QUERY_EVT );
     }
 #endif  //终端设备
     // Discard unknown events
@@ -509,7 +521,7 @@ void SampleApp_HandleKeys( uint8 shift, uint8 keys )
 #endif
     (void)shift;  // Intentionally unreferenced parameter
   
-    if ( keys & HAL_KEY_SW_1 )
+    if ( keys & HAL_KEY_SW_1 )  //S2
     {
         /* This key sends the Flash Command is sent to Group 1.
          * This device will not receive the Flash Command from this
@@ -517,16 +529,14 @@ void SampleApp_HandleKeys( uint8 shift, uint8 keys )
          */
         //SampleApp_SendFlashMessage( SAMPLEAPP_FLASH_DURATION );
         //替换成我的程序，进行按键处理
-        HalUARTWrite(0x00, "HAL_KEY_SW_1\n", 13);       //按键1触发调试
-#if ( ZSTACK_DEVICE_BUILD == DEVICE_BUILD_COORDINATOR )	//协调器
-        
-#elif ( ZSTACK_DEVICE_BUILD == DEVICE_BUILD_ENDDEVICE )	//终端设备                                                   //终端设备
-	//发送按键 确认动作 事件
-	osal_set_event( SampleApp_TaskID, SAMPLEAPP_KEY_ACK_EVT );
+        // HalUARTWrite(0x00, "HAL_KEY_SW_1\n", 13);    //按键1触发调试
+#if ( ZSTACK_DEVICE_BUILD == DEVICE_BUILD_ENDDEVICE )	//终端设备
+	    //设置按键 查询动作 事件
+	    osal_set_event( SampleApp_TaskID, SAMPLEAPP_KEY_QUERY_EVT );
 #endif
     }
 
-    if ( keys & HAL_KEY_SW_2 )
+    if ( keys & HAL_KEY_SW_2 )  //S1
     {
         /* The Flashr Command is sent to Group 1.
          * This key toggles this device in and out of group 1.
@@ -547,15 +557,16 @@ void SampleApp_HandleKeys( uint8 shift, uint8 keys )
             aps_AddGroup( SAMPLEAPP_ENDPOINT, &SampleApp_Group );
         }
         */
-        HalUARTWrite(0x00, "HAL_KEY_SW_2\n", 13);       //按键2串口调试
+        // HalUARTWrite(0x00, "HAL_KEY_SW_2\n", 13);    //按键2串口调试
+#if ( ZSTACK_DEVICE_BUILD == DEVICE_BUILD_ENDDEVICE )	//终端设备
+	//发送按键 确认动作 事件
+	osal_set_event( SampleApp_TaskID, SAMPLEAPP_KEY_ACK_EVT );
+#endif
     }
     if ( keys & HAL_KEY_SW_6 )
     {
         HalUARTWrite(0x00, "HAL_KEY_SW_6\n", 13);       //按键6串口调试
-#if ( ZSTACK_DEVICE_BUILD == DEVICE_BUILD_ENDDEVICE )	//终端设备
-	    //设置按键 查询动作 事件
-	    osal_set_event( SampleApp_TaskID, SAMPLEAPP_KEY_QUERY_EVT );
-#endif
+
 //==================================================================
 #if 0
         //获取设备短地址，并通过发送到串口
@@ -1032,12 +1043,12 @@ void SampleApp_SendFlashMessage( uint16 flashTime )
  *          协调器或终端设备通过RF传输数据
  *          PING
  *
- * @param   none
+ * @param   powerStatus 0-有电 1-没电
  *
  * @return  none
  */
 #if ( ZSTACK_DEVICE_BUILD == DEVICE_BUILD_ENDDEVICE )	//终端设备
-void SampleApp_Send_P2P_Message( void )
+void SampleApp_Send_P2P_Message( uint8 powerStatus )
 {
     uint16 length = 0x00;
     /*
@@ -1045,9 +1056,11 @@ void SampleApp_Send_P2P_Message( void )
      * 4~7 command
      * 8   length - n
      * 9~n+9 value
+     *     9~12 Address
+     *     13   PowerStatus
      */
     uint8 i = 0;
-    uint8 data[13]= {0};
+    uint8 data[14]= {0};
     uint8 guid_str[4] = {0};
     uint8 short_addr[4] = {0};
     SampleApp_GetShortAddrStr(short_addr);
@@ -1060,12 +1073,20 @@ void SampleApp_Send_P2P_Message( void )
     data[5] = 'I';
     data[6] = 'N';
     data[7] = 'G';
-    data[8] = 0x04;
+    data[8] = 0x05;     // value的长度
     for( i=0; i<4; i++ )
     {
         data[i+9] = short_addr[i];
     }
-    length = 13;
+    // 将电池状态添加到发送的数据流中
+    if( powerStatus == 0 ){
+        // 有电
+        data[13] = 'T';
+    } else {
+        // 没电
+        data[13] = 'F';
+    }
+    length = 14;
 
     if ( AF_DataRequest( &SampleApp_P2P_DstAddr, &SampleApp_epDesc,
                        SAMPLEAPP_P2P_CLUSTERID,
@@ -1213,7 +1234,7 @@ void SampleApp_Send_E2C_PushBtn_Evt( uint8 evt )
         osal_msg_deallocate( (uint8 *)data );
         return;
     }
-    data[8] = 0x00;
+    data[8] = 0x06; /* BUG : fix 2018-09-22 */
     data[9] = 'A';
     data[10] = 'D';
     for( i=0;i<4;i++ )
